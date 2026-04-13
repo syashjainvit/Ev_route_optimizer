@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EV Route Optimizer — Smart Delivery Intelligence</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Syne:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   DESIGN TOKENS — DARK (default) + LIGHT
+══════════════════════════════════════════════════════════════════ */
+:root {
+  --bg:     #060e1a; --s1:#0b1624; --s2:#0f1d2e; --s3:#132138;
+  --b1:     #1a3050; --b2:#1f3a60; --b3:#264570;
+  --cy:     #00d4ff; --cy2:rgba(0,212,255,.10); --cy3:rgba(0,212,255,.22);
+  --gn:     #00e87a; --gn2:rgba(0,232,122,.10); --gn3:rgba(0,232,122,.22);
+  --am:     #ffb300; --am2:rgba(255,179,0,.12);
+  --rd:     #ff4757; --rd2:rgba(255,71,87,.12);
+  --pu:     #b06aff; --pu2:rgba(176,106,255,.12);
+  --or:     #ff7043;
+  --tx:     #d0e8f5; --t2:#5a7a96; --t3:#3a5570; --t4:#243a50;
+  --hdr:    rgba(6,14,26,.97);
+  --glass:  rgba(11,22,36,.95);
+  --card:   rgba(15,29,46,.9);
+  --shadow: 0 4px 28px rgba(0,0,0,.55);
+  --sh2:    0 2px 12px rgba(0,0,0,.3);
+  --r:      10px; --r2:6px;
+  --mono:   'IBM Plex Mono',monospace;
+  --ui:     'Inter',sans-serif;
+  --disp:   'Syne',sans-serif;
+  --ease:   .18s cubic-bezier(.4,0,.2,1);
+}
+[data-theme="light"] {
+  --bg:#eef2f7; --s1:#ffffff; --s2:#f5f8fc; --s3:#edf2f8;
+  --b1:#dde5ef; --b2:#c8d5e5; --b3:#b0c2d8;
+  --cy:#0073e6; --cy2:rgba(0,115,230,.08); --cy3:rgba(0,115,230,.18);
+  --gn:#009e5c; --gn2:rgba(0,158,92,.08); --gn3:rgba(0,158,92,.18);
+  --am:#c27d00; --am2:rgba(194,125,0,.10);
+  --rd:#d93025; --rd2:rgba(217,48,37,.10);
+  --pu:#7c3aed; --pu2:rgba(124,58,237,.10);
+  --tx:#1a2e42; --t2:#4a6275; --t3:#7a92a8; --t4:#a8bfcc;
+  --hdr:rgba(255,255,255,.98);
+  --glass:rgba(255,255,255,.97);
+  --card:rgba(248,252,255,.95);
+  --shadow:0 4px 24px rgba(0,40,80,.10);
+  --sh2:0 2px 12px rgba(0,40,80,.07);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   RESET & BASE
+══════════════════════════════════════════════════════════════════ */
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:var(--ui);background:var(--bg);color:var(--tx);display:flex;flex-direction:column;transition:background var(--ease),color var(--ease);}
+::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px;} ::-webkit-scrollbar-track{background:transparent;}
+
+/* ══════════════════════════════════════════════════════════════════
+   HEADER
+══════════════════════════════════════════════════════════════════ */
+#hdr{
+  display:flex;align-items:center;height:52px;flex-shrink:0;
+  background:var(--hdr);border-bottom:1px solid var(--b1);
+  backdrop-filter:blur(14px);z-index:1100;
+  transition:background var(--ease);
+}
+.brand{display:flex;align-items:center;gap:10px;padding:0 18px;border-right:1px solid var(--b1);height:100%;min-width:170px;}
+.brand-icon{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--cy),var(--gn));display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;box-shadow:0 0 18px var(--cy3);}
+.logo{font-family:var(--disp);font-size:15px;font-weight:800;color:var(--tx);letter-spacing:.3px;}
+.logo em{color:var(--cy);font-style:normal;}
+.sub{font-size:9px;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-top:1px;}
+.h-status{display:flex;align-items:center;gap:6px;padding:0 14px;border-right:1px solid var(--b1);height:100%;font-size:10px;font-family:var(--mono);color:var(--t3);}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--t3);}
+.dot.live{background:var(--gn);box-shadow:0 0 8px var(--gn);animation:blink 2s ease infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.h-right{display:flex;align-items:center;margin-left:auto;height:100%;}
+.h-btn{
+  display:flex;align-items:center;gap:7px;padding:0 16px;height:100%;
+  cursor:pointer;border-left:1px solid var(--b1);
+  font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--t2);transition:all var(--ease);border:none;background:transparent;font-family:var(--ui);
+}
+.h-btn:hover{color:var(--tx);background:var(--s2);}
+.h-btn.on{color:var(--gn);}
+.h-btn.on .h-dot{background:var(--gn);box-shadow:0 0 8px var(--gn);animation:blink 1.5s ease infinite;}
+.h-dot{width:7px;height:7px;border-radius:50%;background:var(--t3);flex-shrink:0;}
+/* Theme toggle */
+#themeBtn{display:flex;align-items:center;gap:9px;padding:0 16px;height:100%;cursor:pointer;border-left:1px solid var(--b1);font-size:10px;font-weight:600;color:var(--t2);transition:all var(--ease);border-top:none;border-bottom:none;border-right:none;background:transparent;font-family:var(--ui);}
+#themeBtn:hover{color:var(--am);background:var(--s2);}
+.theme-track{width:34px;height:18px;border-radius:9px;background:var(--b2);position:relative;transition:background .3s;flex-shrink:0;}
+.theme-track::after{content:'';position:absolute;width:12px;height:12px;border-radius:50%;background:var(--am);top:3px;left:3px;transition:transform .3s;}
+[data-theme="light"] .theme-track{background:var(--am);} [data-theme="light"] .theme-track::after{transform:translateX(16px);}
+
+/* ══════════════════════════════════════════════════════════════════
+   LAYOUT
+══════════════════════════════════════════════════════════════════ */
+#app{display:flex;flex:1;overflow:hidden;}
+#panel{width:330px;flex-shrink:0;background:var(--s1);border-right:1px solid var(--b1);display:flex;flex-direction:column;overflow:hidden;transition:background var(--ease);}
+#panel-scroll{flex:1;overflow-y:auto;padding-bottom:2px;}
+#mwrap{flex:1;position:relative;}
+#map{width:100%;height:100%;}
+#result-panel{width:0;flex-shrink:0;background:var(--s1);border-left:1px solid var(--b1);display:flex;flex-direction:column;overflow:hidden;transition:width .35s cubic-bezier(.4,0,.2,1);}
+#result-panel.open{width:370px;}
+
+/* ══════════════════════════════════════════════════════════════════
+   SECTIONS (collapsible)
+══════════════════════════════════════════════════════════════════ */
+.sec{border-bottom:1px solid var(--b1);}
+.sec-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;transition:background var(--ease);user-select:none;}
+.sec-hdr:hover{background:var(--s2);}
+.sec-ico{font-size:14px;flex-shrink:0;}
+.sec-lbl{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t2);flex:1;}
+.sec-badge{background:var(--b2);color:var(--t2);border-radius:10px;padding:1px 8px;font-size:10px;font-family:var(--mono);}
+.sec-badge.hi{background:var(--cy3);color:var(--cy);}
+.chev{font-size:10px;color:var(--t3);transition:transform .2s;}
+.sec.col .chev{transform:rotate(-90deg);} .sec.col .sec-body{display:none;}
+.sec-body{padding:10px 14px 14px;}
+
+/* ══════════════════════════════════════════════════════════════════
+   INPUTS
+══════════════════════════════════════════════════════════════════ */
+input[type=text],input[type=number],select{background:var(--s2);border:1.5px solid var(--b2);border-radius:var(--r2);color:var(--tx);padding:7px 10px;font-size:12px;font-family:var(--mono);outline:none;width:100%;transition:border-color var(--ease),background var(--ease);}
+input:focus,select:focus{border-color:var(--cy);background:var(--s3);}
+input::placeholder{color:var(--t3);}
+.lbl{font-size:10px;color:var(--t3);display:block;margin-bottom:3px;letter-spacing:1px;text-transform:uppercase;}
+.field{}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:7px;} .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+
+/* ══════════════════════════════════════════════════════════════════
+   BUTTONS
+══════════════════════════════════════════════════════════════════ */
+.btn{border:none;border-radius:var(--r2);font-family:var(--ui);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;padding:7px 13px;transition:all var(--ease);white-space:nowrap;}
+.bc{background:var(--cy);color:#040a10;} .bc:hover{filter:brightness(1.1);}
+.bg{background:var(--gn);color:#040a10;} .bg:hover{filter:brightness(1.1);}
+.bx{background:transparent;color:var(--t2);border:1.5px solid var(--b2);} .bx:hover{border-color:var(--cy);color:var(--cy);}
+.br{background:transparent;color:var(--rd);border:1.5px solid var(--rd2);} .br:hover{background:var(--rd);color:#fff;}
+.bfw{width:100%;text-align:center;padding:9px;}
+.run-btn{
+  width:100%;padding:12px;border:none;border-radius:var(--r2);
+  background:linear-gradient(135deg,var(--gn),var(--cy));
+  color:#040a10;font-size:13px;font-weight:800;letter-spacing:1.5px;
+  text-transform:uppercase;cursor:pointer;font-family:var(--disp);
+  transition:all var(--ease);box-shadow:0 4px 20px var(--cy3);
+  position:relative;overflow:hidden;
+}
+.run-btn:hover{transform:translateY(-1px);box-shadow:0 6px 30px var(--cy3);}
+.run-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.14),transparent);transform:translateX(-100%);transition:transform .5s;}
+.run-btn:hover::before{transform:translateX(100%);}
+
+/* ══════════════════════════════════════════════════════════════════
+   MODE PILLS
+══════════════════════════════════════════════════════════════════ */
+.mpills{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px;}
+.mp{padding:8px 4px;text-align:center;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:var(--s2);border:1.5px solid var(--b2);border-radius:var(--r2);cursor:pointer;color:var(--t3);transition:all var(--ease);}
+.mp:hover{color:var(--t2);border-color:var(--b3);}
+.mp.D{border-color:var(--cy);color:var(--cy);background:var(--cy2);}
+.mp.L{border-color:var(--pu);color:var(--pu);background:var(--pu2);}
+.mp.C{border-color:var(--gn);color:var(--gn);background:var(--gn2);}
+.mhint{font-size:11px;color:var(--t3);font-family:var(--mono);line-height:1.6;background:var(--s2);border-radius:5px;padding:7px 10px;border-left:3px solid var(--cy);margin-top:7px;}
+
+/* ══════════════════════════════════════════════════════════════════
+   SEARCH RESULTS
+══════════════════════════════════════════════════════════════════ */
+.sres{border:1px solid var(--b1);border-radius:var(--r2);margin-top:6px;background:var(--s2);overflow:hidden;transition:border-color var(--ease);}
+.sres:hover{border-color:var(--b3);}
+.sres-name{padding:7px 10px 3px;font-size:11px;font-family:var(--mono);color:var(--tx);line-height:1.4;cursor:pointer;}
+.sres-name:hover{color:var(--cy);}
+.sres-coord{padding:0 10px 5px;font-size:10px;color:var(--t3);font-family:var(--mono);}
+.sres-acts{display:flex;border-top:1px solid var(--b1);}
+.sres-act{flex:1;padding:6px 2px;text-align:center;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;transition:all var(--ease);border:none;background:transparent;font-family:var(--ui);color:var(--t2);}
+.sres-act:not(:last-child){border-right:1px solid var(--b1);}
+.sres-act.dep{color:var(--cy);} .sres-act.dep:hover{background:var(--cy2);}
+.sres-act.del{color:var(--pu);} .sres-act.del:hover{background:var(--pu2);}
+.sres-act.chr{color:var(--gn);} .sres-act.chr:hover{background:var(--gn2);}
+.sres-act.jmp{color:var(--t2);} .sres-act.jmp:hover{background:var(--s3);}
+
+/* ══════════════════════════════════════════════════════════════════
+   NODE LIST
+══════════════════════════════════════════════════════════════════ */
+.nl{list-style:none;}
+.ni{display:flex;align-items:center;gap:7px;padding:7px 0;border-bottom:1px solid var(--s3);font-size:11px;}
+.ni:last-child{border-bottom:none;}
+.nb{width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;font-weight:700;flex-shrink:0;}
+.nn{flex:1;font-family:var(--mono);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.nc{font-size:9px;color:var(--t3);white-space:nowrap;font-family:var(--mono);}
+.ndl{cursor:pointer;color:var(--t3);padding:3px 6px;border-radius:4px;font-size:12px;transition:all var(--ease);}
+.ndl:hover{color:var(--rd);background:var(--rd2);}
+.et{font-size:11px;color:var(--t3);font-style:italic;padding:3px 0;}
+
+/* ══════════════════════════════════════════════════════════════════
+   VEHICLE CARDS
+══════════════════════════════════════════════════════════════════ */
+.veh-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;}
+.veh{padding:9px 10px;border:1.5px solid var(--b2);border-radius:var(--r2);cursor:pointer;transition:all var(--ease);background:var(--s2);}
+.veh:hover{border-color:var(--b3);} .veh.on{border-color:var(--cy);background:var(--cy2);}
+.veh-ico{font-size:20px;margin-bottom:3px;}
+.veh-name{font-size:10px;font-weight:700;color:var(--tx);} .veh.on .veh-name{color:var(--cy);}
+.veh-spec{font-size:9px;color:var(--t3);}
+/* Battery bar */
+.batt-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.batt-wrap{flex:1;height:20px;border:2px solid var(--b2);border-radius:5px;position:relative;overflow:hidden;background:var(--s3);}
+.batt-fill{height:100%;border-radius:3px;transition:width .5s,background .5s;}
+.batt-pct{font-family:var(--mono);font-size:14px;font-weight:700;min-width:40px;text-align:right;}
+.est-box{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r2);padding:8px 10px;margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--t2);line-height:2;}
+
+/* ══════════════════════════════════════════════════════════════════
+   STRATEGY CARDS
+══════════════════════════════════════════════════════════════════ */
+.strats{display:flex;flex-direction:column;gap:5px;}
+.strat{padding:9px 12px;border:1.5px solid var(--b2);border-radius:var(--r2);cursor:pointer;transition:all var(--ease);background:var(--s2);display:flex;align-items:center;gap:10px;}
+.strat:hover{border-color:var(--b3);background:var(--s3);}
+.strat.on{border-color:var(--cy);background:var(--cy2);}
+.strat-ico{font-size:20px;flex-shrink:0;width:28px;text-align:center;}
+.strat-body{flex:1;}
+.strat-name{font-size:12px;font-weight:700;color:var(--tx);} .strat.on .strat-name{color:var(--cy);}
+.strat-desc{font-size:10px;color:var(--t3);margin-top:1px;line-height:1.4;}
+.strat-algo{font-size:9px;color:var(--t3);margin-top:2px;font-family:var(--mono);} .strat.on .strat-algo{color:var(--cy);}
+.cmp-btn{
+  margin-top:8px;width:100%;padding:10px;
+  background:linear-gradient(135deg,var(--cy2),var(--pu2));
+  border:1.5px solid var(--cy);border-radius:var(--r2);
+  color:var(--cy);font-size:11px;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;cursor:pointer;transition:all var(--ease);font-family:var(--ui);
+}
+.cmp-btn:hover{background:var(--cy3);box-shadow:0 0 20px var(--cy2);}
+.cmp-btn.loading{opacity:.6;cursor:wait;}
+
+/* ══════════════════════════════════════════════════════════════════
+   PANEL FOOTER
+══════════════════════════════════════════════════════════════════ */
+.panel-footer{padding:12px 14px;background:var(--s2);border-top:2px solid var(--b1);flex-shrink:0;transition:background var(--ease);}
+
+/* ══════════════════════════════════════════════════════════════════
+   RESULTS PANEL
+══════════════════════════════════════════════════════════════════ */
+.rp-hdr{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid var(--b1);flex-shrink:0;gap:8px;}
+.rp-title{font-family:var(--disp);font-size:14px;font-weight:700;color:var(--tx);flex:1;}
+.rp-close{width:26px;height:26px;border-radius:5px;border:1px solid var(--b2);background:transparent;color:var(--t2);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all var(--ease);}
+.rp-close:hover{border-color:var(--rd);color:var(--rd);}
+.rp-tabs{display:flex;border-bottom:1px solid var(--b1);flex-shrink:0;}
+.rp-tab{flex:1;padding:9px 4px;text-align:center;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;transition:all var(--ease);}
+.rp-tab:hover{color:var(--t2);} .rp-tab.on{color:var(--cy);border-bottom-color:var(--cy);}
+.rp-content{flex:1;overflow-y:auto;}
+.rp-view{display:none;padding:14px;} .rp-view.on{display:block;}
+
+/* Algorithm comparison cards */
+.algo-cards{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+.ac{border:1.5px solid var(--b2);border-radius:var(--r);background:var(--s2);overflow:hidden;cursor:pointer;transition:all var(--ease);}
+.ac:hover{border-color:var(--b3);box-shadow:var(--sh2);}
+.ac.sel{border-color:var(--cy);box-shadow:0 0 18px var(--cy2);}
+.ac.best{border-color:var(--gn);}
+.ac-hdr{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--s3);border-bottom:1px solid var(--b1);}
+.ac-ico{font-size:16px;flex-shrink:0;}
+.ac-nm{font-size:12px;font-weight:700;color:var(--tx);flex:1;}
+.ac.best .ac-nm{color:var(--gn);} .ac.sel .ac-nm{color:var(--cy);}
+.ac-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;text-transform:uppercase;letter-spacing:.8px;font-family:var(--mono);}
+.b-best{background:var(--gn2);color:var(--gn);border:1px solid var(--gn);}
+.b-sel{background:var(--cy2);color:var(--cy);border:1px solid var(--cy);}
+/* 5-col metrics table inside comparison card */
+.ac-metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--b1);}
+.ac-met{background:var(--s2);padding:8px 4px;text-align:center;}
+.ac-mv{font-family:var(--mono);font-size:13px;font-weight:700;}
+.ac-ml{font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-top:1px;}
+.ac-foot{padding:8px 12px;display:flex;align-items:center;justify-content:space-between;}
+.view-btn{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--cy);background:var(--cy2);border:1px solid var(--cy);border-radius:4px;padding:4px 10px;cursor:pointer;transition:all var(--ease);font-family:var(--ui);}
+.view-btn:hover{background:var(--cy);color:var(--bg);}
+.stars{font-size:12px;color:var(--am);}
+
+/* Recommendation box */
+.rec{background:linear-gradient(135deg,var(--gn2),var(--cy2));border:1.5px solid var(--gn);border-radius:var(--r);padding:12px;margin-bottom:14px;}
+.rec-title{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gn);margin-bottom:4px;}
+.rec-body{font-size:12px;color:var(--tx);line-height:1.5;}
+.rec-algo{font-family:var(--mono);font-size:10px;color:var(--t2);margin-top:4px;}
+
+/* Summary stats bar */
+.sstats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;}
+.sstat{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r2);padding:10px;text-align:center;}
+.sstat-v{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--cy);}
+.sstat-l{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;margin-top:2px;}
+
+/* Step list */
+.steps{list-style:none;}
+.step{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--s3);position:relative;}
+.step:last-child{border-bottom:none;}
+.step:not(:last-child)::before{content:'';position:absolute;left:11px;top:35px;bottom:-9px;width:1px;background:var(--b2);}
+.step-ico{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;z-index:1;font-weight:700;font-family:var(--mono);}
+.step-info{flex:1;}
+.step-name{font-size:11px;font-family:var(--mono);color:var(--tx);}
+.step-meta{font-size:10px;color:var(--t3);margin-top:2px;}
+.step-batt{font-family:var(--mono);font-size:12px;font-weight:700;white-space:nowrap;}
+/* Battery legend strip */
+.bleg{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+.bleg-i{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--t3);}
+.bleg-d{width:14px;height:4px;border-radius:2px;}
+
+/* ══════════════════════════════════════════════════════════════════
+   MAP OVERLAYS
+══════════════════════════════════════════════════════════════════ */
+.map-hint{position:absolute;bottom:16px;left:14px;background:var(--glass);backdrop-filter:blur(8px);border:1px solid var(--b2);border-radius:var(--r);padding:9px 13px;font-size:11px;font-family:var(--mono);color:var(--t2);z-index:900;pointer-events:none;max-width:270px;line-height:1.5;box-shadow:var(--sh2);}
+.map-leg{position:absolute;top:14px;right:14px;background:var(--glass);backdrop-filter:blur(8px);border:1px solid var(--b2);border-radius:var(--r);padding:10px 14px;z-index:900;box-shadow:var(--sh2);}
+.leg-title{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;}
+.lr{display:flex;align-items:center;gap:7px;padding:3px 0;color:var(--t2);font-size:10px;}
+.ld{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.ld.seg{border-radius:2px;height:3px;width:16px;}
+/* Constraint error flash */
+.c-err{position:absolute;top:60px;left:50%;transform:translateX(-50%);background:var(--rd);color:#fff;border-radius:var(--r);padding:10px 20px;font-size:12px;font-weight:700;z-index:8000;box-shadow:var(--shadow);pointer-events:none;animation:cslide .3s ease,cfade .3s ease 2.5s forwards;}
+@keyframes cslide{from{transform:translateX(-50%) translateY(-20px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
+@keyframes cfade{to{opacity:0;transform:translateX(-50%) translateY(-10px)}}
+/* Loading overlay */
+#ov{position:absolute;inset:0;background:var(--glass);backdrop-filter:blur(5px);display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;z-index:9000;}
+#ov.on{display:flex;}
+.spin{width:38px;height:38px;border-radius:50%;border:2px solid var(--b2);border-top-color:var(--cy);animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.ov-msg{font-family:var(--mono);font-size:11px;color:var(--t2);letter-spacing:2px;text-transform:uppercase;}
+.ov-sub{font-size:10px;color:var(--t3);}
+/* Progress bar */
+#rtbar{position:absolute;top:0;left:0;right:0;height:2px;z-index:901;display:none;background:linear-gradient(90deg,var(--cy),var(--gn),var(--cy));background-size:200% 100%;animation:rtf 2s linear infinite;}
+#rtbar.on{display:block;}
+@keyframes rtf{0%{background-position:0%}100%{background-position:200%}}
+
+/* ══════════════════════════════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════════════════════════════ */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--s2);border:1.5px solid var(--b2);border-radius:var(--r);padding:10px 20px;font-size:12px;font-family:var(--mono);z-index:99999;transition:transform .35s cubic-bezier(.34,1.56,.64,1);pointer-events:none;white-space:nowrap;box-shadow:var(--shadow);max-width:90vw;}
+#toast.on{transform:translateX(-50%) translateY(0);}
+#toast.err{border-color:var(--rd);color:var(--rd);}
+#toast.ok{border-color:var(--gn);color:var(--gn);}
+#toast.warn{border-color:var(--am);color:var(--am);}
+
+/* ══════════════════════════════════════════════════════════════════
+   LEAFLET OVERRIDES
+══════════════════════════════════════════════════════════════════ */
+.leaflet-popup-content-wrapper{border-radius:10px!important;font-family:var(--mono)!important;font-size:11px!important;box-shadow:0 8px 32px rgba(0,0,0,.25)!important;}
+[data-theme="dark"] .leaflet-popup-content-wrapper{background:#0f1d2e!important;color:#c8dff0!important;border:1px solid #1a3050!important;}
+[data-theme="dark"] .leaflet-popup-tip{background:#0f1d2e!important;}
+[data-theme="dark"] .leaflet-control-zoom a{background:#0b1624!important;color:#c8dff0!important;border-color:#1a3050!important;}
+[data-theme="dark"] .leaflet-tile-pane{filter:brightness(.85) saturate(.75);}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ HEADER ═══════════════════ -->
+<div id="hdr">
+  <div class="brand">
+    <div class="brand-icon">⚡</div>
+    <div>
+      <div class="logo">EV<em>ROUTE</em></div>
+      <div class="sub">Smart Optimizer v2</div>
+    </div>
+  </div>
+  <div class="h-status" id="apiStatus">
+    <div class="dot" id="apiDot"></div>
+    <span id="apiTxt" style="font-size:10px">Connecting…</span>
+  </div>
+  <div class="h-right">
+    <button class="h-btn" id="gpsBtn" onclick="toggleGPS()">
+      <div class="h-dot" id="gpsDot"></div>
+      <span id="gpsLbl">GPS</span>
+    </button>
+    <button class="h-btn" onclick="clearAll()">🗑 Reset</button>
+    <button id="themeBtn" onclick="toggleTheme()">
+      <span id="themeIco">🌙</span>
+      <div class="theme-track"></div>
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════ APP ═══════════════════ -->
+<div id="app">
+
+  <!-- ────── LEFT PANEL ────── -->
+  <div id="panel">
+    <div id="panel-scroll">
+
+      <!-- § 1 Place Nodes -->
+      <div class="sec" id="sec-mode">
+        <div class="sec-hdr" onclick="togSec('mode')">
+          <span class="sec-ico">📍</span>
+          <span class="sec-lbl">Place Locations</span>
+          <span class="sec-badge hi" id="badge-nodes">0 nodes</span>
+          <span class="chev">▾</span>
+        </div>
+        <div class="sec-body">
+          <div class="mpills">
+            <div class="mp D" data-mode="depot"    onclick="setMode('depot')">🏭 Depot</div>
+            <div class="mp"   data-mode="delivery" onclick="setMode('delivery')">📦 Delivery</div>
+            <div class="mp"   data-mode="charging" onclick="setMode('charging')">⚡ Station</div>
+          </div>
+          <div class="mhint" id="mhint">→ <strong style="color:var(--cy)">DEPOT MODE</strong> — click anywhere on the map</div>
+          <div style="margin-top:10px">
+            <div style="display:flex;gap:6px">
+              <input type="text" id="si" placeholder="Search city, address, landmark in India…" onkeydown="if(event.key==='Enter')doSearch()"/>
+              <button class="btn bc" onclick="doSearch()">Go</button>
+            </div>
+            <div style="font-size:10px;color:var(--t3);margin-top:4px;font-family:var(--mono)">India only — powered by OpenStreetMap</div>
+            <div id="sr" style="margin-top:4px"></div>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:5px;align-items:center">
+            <button class="btn bx" style="flex:1;font-size:10px" onclick="fetchStations()">⚡ Fetch Nearby EV Stations</button>
+            <input type="number" id="rad" value="30" min="5" max="200" style="width:54px;padding:7px 5px"/>
+            <span style="font-size:10px;color:var(--t3)">km</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- § 2 Locations list -->
+      <div class="sec col" id="sec-nodes">
+        <div class="sec-hdr" onclick="togSec('nodes')">
+          <span class="sec-ico">📋</span>
+          <span class="sec-lbl">Added Locations</span>
+          <span class="sec-badge" id="badge-locs">0</span>
+          <span class="chev">▾</span>
+        </div>
+        <div class="sec-body">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:5px">Depot</div>
+          <div id="ddsp"><div class="et">Not set</div></div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin:10px 0 5px">Deliveries <span id="dct" style="color:var(--pu)">0</span></div>
+          <ul class="nl" id="dlist"><li><div class="et">None added</div></li></ul>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin:10px 0 5px">Charging Stations <span id="cct" style="color:var(--gn)">0</span></div>
+          <ul class="nl" id="clist"><li><div class="et">None added</div></li></ul>
+        </div>
+      </div>
+
+      <!-- § 3 Vehicle & Battery -->
+      <div class="sec col" id="sec-vehicle">
+        <div class="sec-hdr" onclick="togSec('vehicle')">
+          <span class="sec-ico">🚗</span>
+          <span class="sec-lbl">Vehicle & Battery</span>
+          <span class="sec-badge" id="badge-batt">80% · 300km</span>
+          <span class="chev">▾</span>
+        </div>
+        <div class="sec-body">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:7px">Vehicle</div>
+          <div class="veh-grid">
+            <div class="veh on" data-v="model3" onclick="setVehicle(this)"><div class="veh-ico">🚗</div><div class="veh-name">Tesla Model 3</div><div class="veh-spec">300km · 0.14kWh/km</div></div>
+            <div class="veh"    data-v="modely" onclick="setVehicle(this)"><div class="veh-ico">🚙</div><div class="veh-name">Tesla Model Y</div><div class="veh-spec">380km · 0.18kWh/km</div></div>
+            <div class="veh"    data-v="leaf"   onclick="setVehicle(this)"><div class="veh-ico">🌿</div><div class="veh-name">Nissan Leaf</div><div class="veh-spec">200km · 0.16kWh/km</div></div>
+            <div class="veh"    data-v="van"    onclick="setVehicle(this)"><div class="veh-ico">🚐</div><div class="veh-name">Delivery Van</div><div class="veh-spec">150km · 0.28kWh/km</div></div>
+            <div class="veh"    data-v="id4"    onclick="setVehicle(this)"><div class="veh-ico">⚡</div><div class="veh-name">VW ID.4</div><div class="veh-spec">350km · 0.17kWh/km</div></div>
+            <div class="veh"    data-v="custom" onclick="setVehicle(this)"><div class="veh-ico">🔧</div><div class="veh-name">Custom</div><div class="veh-spec">Manual entry</div></div>
+          </div>
+          <div class="batt-row">
+            <div class="batt-wrap"><div class="batt-fill" id="bfill" style="width:80%;background:#00e87a"></div></div>
+            <div class="batt-pct" id="bpct" style="color:#00e87a">80%</div>
+          </div>
+          <div class="grid2" style="margin-bottom:7px">
+            <div class="field"><label class="lbl">Battery %</label><input type="number" id="batt" value="80" min="1" max="100" oninput="battChange()"/></div>
+            <div class="field"><label class="lbl">Max Range km</label><input type="number" id="maxr" value="300" min="10" oninput="updateEst()"/></div>
+            <div class="field"><label class="lbl">kWh / km</label><input type="number" id="cons" value="0.14" min="0.01" step="0.01"/></div>
+            <div class="field"><label class="lbl">Buffer %</label><input type="number" id="buf"  value="10" min="0" max="40"/></div>
+          </div>
+          <div class="est-box" id="est">—</div>
+        </div>
+      </div>
+
+      <!-- § 4 GPS -->
+      <div class="sec col" id="sec-gps">
+        <div class="sec-hdr" onclick="togSec('gps')">
+          <span class="sec-ico">📡</span>
+          <span class="sec-lbl">GPS Tracking</span>
+          <span class="chev">▾</span>
+        </div>
+        <div class="sec-body">
+          <div style="font-size:10px;color:var(--t3);font-family:var(--mono);line-height:1.7;background:var(--s2);padding:6px 9px;border-radius:5px;margin-bottom:7px" id="gpsSt">GPS inactive</div>
+          <div style="display:flex;gap:5px">
+            <button class="btn bx" style="flex:1" onclick="startGPS()">⊙ Start</button>
+            <button class="btn bx" style="flex:1" onclick="stopGPS()">◻ Stop</button>
+            <button class="btn bc" style="flex:1" onclick="depotFromGPS()">📍 Depot</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- § 5 Route Strategy -->
+      <div class="sec" id="sec-strat">
+        <div class="sec-hdr" onclick="togSec('strat')">
+          <span class="sec-ico">🎯</span>
+          <span class="sec-lbl">Route Strategy</span>
+          <span class="sec-badge hi" id="badge-strat">Quick Route</span>
+          <span class="chev">▾</span>
+        </div>
+        <div class="sec-body">
+          <div class="strats" id="stratCards">
+            <div class="strat on" data-algo="greedy" onclick="setStrat(this)">
+              <div class="strat-ico">⚡</div>
+              <div class="strat-body">
+                <div class="strat-name">Quick Route</div>
+                <div class="strat-desc">Best for time-critical deliveries. Instant result.</div>
+                <div class="strat-algo">Greedy Nearest-Neighbour</div>
+              </div>
+            </div>
+            <div class="strat" data-algo="twoopt" onclick="setStrat(this)">
+              <div class="strat-ico">🎯</div>
+              <div class="strat-body">
+                <div class="strat-name">Balanced Route</div>
+                <div class="strat-desc">Reduces unnecessary backtracking. Good all-around choice.</div>
+                <div class="strat-algo">2-Opt Local Search</div>
+              </div>
+            </div>
+            <div class="strat" data-algo="insertion" onclick="setStrat(this)">
+              <div class="strat-ico">🛡️</div>
+              <div class="strat-body">
+                <div class="strat-name">Safe Route</div>
+                <div class="strat-desc">Conservative planning, minimises range anxiety.</div>
+                <div class="strat-algo">Nearest Insertion</div>
+              </div>
+            </div>
+            <div class="strat" data-algo="genetic" onclick="setStrat(this)">
+              <div class="strat-ico">🧬</div>
+              <div class="strat-body">
+                <div class="strat-name">Smart AI Route</div>
+                <div class="strat-desc">Evolutionary search across 300 generations. High quality.</div>
+                <div class="strat-algo">Genetic Algorithm</div>
+              </div>
+            </div>
+            <div class="strat" data-algo="aco" onclick="setStrat(this)">
+              <div class="strat-ico">🐜</div>
+              <div class="strat-body">
+                <div class="strat-name">Battery Efficient Route</div>
+                <div class="strat-desc">Swarm-intelligence that finds energy-minimal paths.</div>
+                <div class="strat-algo">Ant Colony Optimization</div>
+              </div>
+            </div>
+          </div>
+          <button class="cmp-btn" id="cmpBtn" onclick="runCompare()">🔬 Compare All 5 Algorithms</button>
+        </div>
+      </div>
+
+    </div><!-- end panel-scroll -->
+    <div class="panel-footer">
+
+  <div id="validationStatus" style="
+    font-size:11px;
+    font-family:var(--mono);
+    margin-bottom:8px;
+    color:var(--t2);
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  ">
+    <span id="vDepot">🏭 Depot ✗</span>
+    <span id="vDelivery">📦 Delivery ✗</span>
+  </div>
+
+  <button id="optBtn" class="run-btn" onclick="validateAndOptimize()" disabled>
+    ▶ OPTIMIZE ROUTE
+  </button>
+</div>
+  </div>
+
+  <!-- ────── MAP ────── -->
+  <div id="mwrap">
+    <div id="rtbar"></div>
+    <div id="map"></div>
+    <div class="map-hint" id="mapHint">→ <strong style="color:var(--cy)">DEPOT MODE</strong> — Click the map to place depot</div>
+    <div class="map-leg">
+      <div class="leg-title">Legend</div>
+      <div class="lr"><div class="ld" style="background:var(--cy)"></div>Depot</div>
+      <div class="lr"><div class="ld" style="background:var(--pu)"></div>Delivery Stop</div>
+      <div class="lr"><div class="ld" style="background:var(--gn)"></div>Charging Station</div>
+      <div class="lr"><div class="ld seg" style="background:var(--gn)"></div>&gt;65% battery</div>
+      <div class="lr"><div class="ld seg" style="background:var(--am)"></div>30–65% battery</div>
+      <div class="lr"><div class="ld seg" style="background:var(--rd)"></div>&lt;30% battery</div>
+      <div class="lr"><div class="ld" style="background:#ff6b6b"></div>Your Location</div>
+    </div>
+    <div id="ov">
+      <div class="spin"></div>
+      <div class="ov-msg" id="ovMsg">Processing…</div>
+      <div class="ov-sub" id="ovSub"></div>
+    </div>
+  </div>
+
+  <!-- ────── RESULTS PANEL ────── -->
+  <div id="result-panel">
+    <div class="rp-hdr">
+      <span style="font-size:16px">📊</span>
+      <div class="rp-title">Route Results</div>
+      <button class="rp-close" onclick="closeResults()">✕</button>
+    </div>
+    <div class="rp-tabs">
+      <div class="rp-tab on" data-rv="rv-cmp"   onclick="rpTab(this)">Compare</div>
+      <div class="rp-tab"    data-rv="rv-steps" onclick="rpTab(this)">Steps</div>
+      <div class="rp-tab"    data-rv="rv-data"  onclick="rpTab(this)">Data</div>
+    </div>
+    <div class="rp-content">
+      <div class="rp-view on" id="rv-cmp"></div>
+      <div class="rp-view"    id="rv-steps"></div>
+      <div class="rp-view"    id="rv-data"></div>
+    </div>
+  </div>
+
+</div><!-- end app -->
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// CONFIG & STATE
+// ════════════════════════════════════════════════════════════════
+const API = 'http://localhost:5000';
+let apiOnline = false;
+let selectedAlgo = 'greedy';
+let allResults = null;
+let displayedResult = null;
+const S  = { depot:null, deliveries:[], stations:[], mode:'depot', gpsId:null, gpsPos:null };
+const MK = { depot:null, deliveries:[], stations:[], gps:null };
+let routeLayer = null;
+
+const VEHICLES = {
+  model3:{ maxr:300, cons:0.14, buf:10 }, modely:{ maxr:380, cons:0.18, buf:10 },
+  leaf:{   maxr:200, cons:0.16, buf:15 }, van:{   maxr:150, cons:0.28, buf:20 },
+  id4:{    maxr:350, cons:0.17, buf:10 }, custom:{ maxr:300, cons:0.18, buf:10 },
+};
+const ALGOS = {
+  greedy:   { name:'Quick Route',            label:'Greedy Nearest-Neighbour', icon:'⚡' },
+  twoopt:   { name:'Balanced Route',         label:'2-Opt Local Search',       icon:'🎯' },
+  insertion:{ name:'Safe Route',             label:'Nearest Insertion',        icon:'🛡️' },
+  genetic:  { name:'Smart AI Route',         label:'Genetic Algorithm',        icon:'🧬' },
+  aco:      { name:'Battery Efficient Route',label:'Ant Colony Optimization',  icon:'🐜' },
+};
+const WATER = ['ocean','sea',' sea','gulf','pacific','atlantic','indian ocean','arctic','bay of','strait','bight','mediterranean','caspian','red sea','arabian sea','bay of bengal','south china sea','caribbean','coral sea','tasman','persian gulf'];
+
+// ════════════════════════════════════════════════════════════════
+// MAP
+// ════════════════════════════════════════════════════════════════
+const map = L.map('map',{zoomControl:true}).setView([20.5937,78.9629],5);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+  subdomains:'abcd',maxZoom:19
+}).addTo(map);
+routeLayer = L.layerGroup().addTo(map);
+map.on('click', e => mapClick(e.latlng.lat, e.latlng.lng));
+
+// ════════════════════════════════════════════════════════════════
+// ICONS
+// ════════════════════════════════════════════════════════════════
+function depotIcon(){
+  return L.divIcon({className:'',iconSize:[40,50],iconAnchor:[20,50],popupAnchor:[0,-52],
+    html:`<div style="position:relative;width:40px;height:50px">
+      <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#00d4ff,#0090b8);border:3px solid rgba(255,255,255,.9);box-shadow:0 4px 20px rgba(0,212,255,.5);display:flex;align-items:center;justify-content:center;font-size:18px">🏭</div>
+      <div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:10px solid #00d4ff"></div>
+    </div>`});
+}
+function delivIcon(n,sel=false){
+  const c=sel?'#00d4ff':'#b06aff', g=sel?'rgba(0,212,255,.5)':'rgba(176,106,255,.4)';
+  return L.divIcon({className:'',iconSize:[32,40],iconAnchor:[16,40],popupAnchor:[0,-42],
+    html:`<div style="position:relative;width:32px;height:40px">
+      <div style="width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${c};border:3px solid rgba(255,255,255,.9);box-shadow:0 4px 16px ${g};display:flex;align-items:center;justify-content:center">
+        <span style="transform:rotate(45deg);font-size:12px;font-weight:800;font-family:IBM Plex Mono,monospace;color:#040a10">${n}</span>
+      </div>
+    </div>`});
+}
+function statIcon(src){
+  const c=src==='osm'?'#00e87a':'#00b860';
+  return L.divIcon({className:'',iconSize:[28,36],iconAnchor:[14,36],popupAnchor:[0,-38],
+    html:`<div style="position:relative;width:28px;height:36px">
+      <div style="width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${c};border:2.5px solid rgba(255,255,255,.9);box-shadow:0 4px 14px rgba(0,232,122,.4);display:flex;align-items:center;justify-content:center">
+        <span style="transform:rotate(45deg);font-size:12px">⚡</span>
+      </div>
+    </div>`});
+}
+function gpsIcon(){
+  return L.divIcon({className:'',iconSize:[24,24],iconAnchor:[12,12],
+    html:`<div style="width:24px;height:24px;border-radius:50%;background:#ff6b6b;border:3px solid white;animation:gp 1.5s infinite"></div><style>@keyframes gp{0%{box-shadow:0 0 0 0 rgba(255,107,107,.7)}70%{box-shadow:0 0 0 12px rgba(255,107,107,0)}100%{box-shadow:0 0 0 0 rgba(255,107,107,0)}}</style>`});
+}
+
+function updateValidationUI(){
+
+  const hasDepot = !!S.depot;
+  const hasDelivery = S.deliveries.length > 0;
+
+  const depotEl = document.getElementById('vDepot');
+  const delEl = document.getElementById('vDelivery');
+  const btn = document.getElementById('optBtn');
+
+  // Depot status
+  depotEl.innerHTML = hasDepot 
+    ? "🏭 Depot ✓" 
+    : "🏭 Depot ✗";
+
+  depotEl.style.color = hasDepot ? "var(--gn)" : "var(--rd)";
+
+  // Delivery status
+  delEl.innerHTML = hasDelivery 
+    ? `📦 Delivery ✓ (${S.deliveries.length})` 
+    : "📦 Delivery ✗";
+
+  delEl.style.color = hasDelivery ? "var(--gn)" : "var(--rd)";
+
+  // Button enable/disable
+  if(hasDepot && hasDelivery){
+    btn.disabled = false;
+    btn.style.opacity = "1";
+    btn.style.cursor = "pointer";
+  } else {
+    btn.disabled = true;
+    btn.style.opacity = "0.5";
+    btn.style.cursor = "not-allowed";
+  }
+}
+
+
+// ════════════════════════════════════════════════════════════════
+// WATER / CONSTRAINT CHECK
+// ════════════════════════════════════════════════════════════════
+async function isWater(lat,lng){
+  if(Math.abs(lat)>85) return {w:true,r:'Extreme polar region — cannot place node here'};
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=8&addressdetails=1`,{headers:{'Accept-Language':'en','User-Agent':'EVRouteOptimizer/2.0'}});
+    if(!r.ok) return {w:false};
+    const d=await r.json();
+    if(!d||d.error) return {w:true,r:'Location is in open water or uninhabited area'};
+    const name=(d.display_name||'').toLowerCase();
+    const cat=(d.category||'').toLowerCase(), typ=(d.type||'').toLowerCase();
+    if(cat==='natural'&&['water','bay','strait','sea'].includes(typ)) return {w:true,r:`Location is in a water body (${d.type})`};
+    if(cat==='place'&&typ==='sea') return {w:true,r:'Location is in the sea'};
+    for(const t of WATER) if(name.includes(t)) return {w:true,r:`Location appears to be in ${(d.display_name||'').split(',')[0]||'a water body'}`};
+    const a=d.address||{};
+    if(!a.country&&!a.state&&!a.city&&!a.town&&!a.village&&!a.island&&!a.suburb&&!a.county) return {w:true,r:'Location is in open water or very remote area'};
+    return {w:false};
+  }catch{return {w:false};}
+}
+function showErr(msg){
+  document.getElementById('constraintMsg')?.remove();
+  const el=document.createElement('div'); el.id='constraintMsg'; el.className='c-err'; el.textContent='🚫 '+msg;
+  document.getElementById('mwrap').appendChild(el); toast('🚫 '+msg,'err');
+  setTimeout(()=>el.parentNode&&el.parentNode.removeChild(el),3200);
+}
+
+// ════════════════════════════════════════════════════════════════
+// MAP CLICK → place node
+// ════════════════════════════════════════════════════════════════
+async function mapClick(lat,lng){
+  document.getElementById('rtbar').classList.add('on');
+  const wc=await isWater(lat,lng);
+  document.getElementById('rtbar').classList.remove('on');
+  if(wc.w){showErr(wc.r||'Cannot place node in water');return;}
+  if(S.mode==='depot')    placeDepot(lat,lng);
+  else if(S.mode==='delivery') placeDelivery(lat,lng,`Stop ${S.deliveries.length+1}`);
+  else placeStation(lat,lng,`Station ${S.stations.length+1}`,'manual');
+}
+
+// ════════════════════════════════════════════════════════════════
+// PLACE NODES
+// ════════════════════════════════════════════════════════════════
+async function placeDepot(lat,lng,name){
+  if (S.depot) {
+  toast('❌ Only one depot allowed', 'err');
+  return;
+}
+  if(!name) name=`${lat.toFixed(4)},${lng.toFixed(4)}`;
+  if(MK.depot){map.removeLayer(MK.depot);MK.depot=null;}
+  S.depot={lat,lng,name,type:'depot'};
+  MK.depot=L.marker([lat,lng],{icon:depotIcon(),zIndexOffset:1000}).addTo(map)
+    .bindPopup(`<b style="color:#00d4ff">🏭 DEPOT</b><br>${name}<br><small>${lat.toFixed(6)}, ${lng.toFixed(6)}</small>`);
+  renderNodes();updateEst();toast('📍 Depot placed');
+  const n=await revGeo(lat,lng); if(n){S.depot.name=n;MK.depot.setPopupContent(`<b style="color:#00d4ff">🏭 DEPOT</b><br>${n}`);renderNodes();}
+}
+async function placeDelivery(lat,lng,name){
+  const id=Date.now()+Math.random(), num=S.deliveries.length+1;
+  S.deliveries.push({id,lat,lng,name,type:'delivery'});
+  const m=L.marker([lat,lng],{icon:delivIcon(num)}).addTo(map)
+    .bindPopup(`<b style="color:#b06aff">📦 Stop #${num}</b><br>${name}<br><small>${lat.toFixed(6)}, ${lng.toFixed(6)}</small>`);
+  MK.deliveries.push({id,m}); renderNodes(); toast(`📦 Stop #${num} added`);
+  const n=await revGeo(lat,lng);
+  if(n){const d=S.deliveries.find(x=>x.id===id);if(d){d.name=n;m.setPopupContent(`<b style="color:#b06aff">📦 Stop #${num}</b><br>${n}`);renderNodes();}}
+}
+function removeDelivery(id){
+  const i=MK.deliveries.findIndex(x=>x.id===id);
+  if(i!==-1){map.removeLayer(MK.deliveries[i].m);MK.deliveries.splice(i,1);}
+  S.deliveries=S.deliveries.filter(d=>d.id!==id);
+  S.deliveries.forEach((d,i)=>{
+    const mk=MK.deliveries.find(x=>x.id===d.id);
+    if(mk){map.removeLayer(mk.m);const nm=L.marker([d.lat,d.lng],{icon:delivIcon(i+1)}).addTo(map).bindPopup(`<b style="color:#b06aff">📦 Stop #${i+1}</b><br>${d.name}`);mk.m=nm;}
+  }); renderNodes();
+}
+function placeStation(lat,lng,name,src='manual'){
+  const id=Date.now()+Math.random();
+  S.stations.push({id,lat,lng,name,src,type:'charging'});
+  const m=L.marker([lat,lng],{icon:statIcon(src)}).addTo(map)
+    .bindPopup(`<b style="color:#00e87a">⚡ ${name}</b><br>${src==='osm'?'<em>OpenStreetMap</em>':'Manual'}<br><small>${lat.toFixed(6)}, ${lng.toFixed(6)}</small>`);
+  MK.stations.push({id,m}); renderNodes();
+}
+function removeStation(id){
+  const i=MK.stations.findIndex(x=>x.id===id);
+  if(i!==-1){map.removeLayer(MK.stations[i].m);MK.stations.splice(i,1);}
+  S.stations=S.stations.filter(s=>s.id!==id); renderNodes();
+}
+
+// ════════════════════════════════════════════════════════════════
+// RENDER SIDEBAR
+// ════════════════════════════════════════════════════════════════
+function renderNodes(){
+  const total=(S.depot?1:0)+S.deliveries.length+S.stations.length;
+  document.getElementById('badge-nodes').textContent=total+' nodes';
+  document.getElementById('badge-locs').textContent=S.deliveries.length+' stops';
+  document.getElementById('dct').textContent=S.deliveries.length;
+  document.getElementById('cct').textContent=S.stations.length;
+  document.getElementById('ddsp').innerHTML=S.depot
+    ?`<div class="ni"><div class="nb" style="background:var(--cy2);color:var(--cy)">🏭</div><div class="nn">${S.depot.name}</div><div class="nc">${S.depot.lat.toFixed(3)},${S.depot.lng.toFixed(3)}</div></div>`
+    :`<div class="et">Not set</div>`;
+  document.getElementById('dlist').innerHTML=S.deliveries.length
+    ?S.deliveries.map((d,i)=>`<li class="ni"><div class="nb" style="background:var(--pu2);color:var(--pu);font-weight:800">${i+1}</div><div class="nn">${d.name}</div><div class="nc">${d.lat.toFixed(3)},${d.lng.toFixed(3)}</div><div class="ndl" onclick="removeDelivery(${d.id})">✕</div></li>`).join('')
+    :`<li><div class="et">None added</div></li>`;
+  document.getElementById('clist').innerHTML=S.stations.length
+    ?S.stations.map(s=>`<li class="ni"><div class="nb" style="background:var(--gn2);color:var(--gn)">⚡</div><div class="nn">${s.name}${s.src==='osm'?'<span style="font-size:9px;color:var(--gn);margin-left:3px">OSM</span>':''}</div><div class="nc">${s.lat.toFixed(3)},${s.lng.toFixed(3)}</div><div class="ndl" onclick="removeStation(${s.id})">✕</div></li>`).join('')
+    :`<li><div class="et">None added</div></li>`;
+    updateValidationUI();
+}
+
+// ════════════════════════════════════════════════════════════════
+// GPS
+// ════════════════════════════════════════════════════════════════
+function toggleGPS(){S.gpsId?stopGPS():startGPS();}
+function startGPS(){
+  if(!navigator.geolocation){toast('Geolocation not supported','err');return;}
+  if(S.gpsId!==null)return;
+  document.getElementById('gpsSt').textContent='Acquiring GPS signal…';
+  document.getElementById('rtbar').classList.add('on');
+  document.getElementById('gpsBtn').classList.add('on');
+  document.getElementById('gpsLbl').textContent='GPS LIVE';
+  S.gpsId=navigator.geolocation.watchPosition(
+    pos=>{const{latitude:lat,longitude:lng,accuracy:acc}=pos.coords;S.gpsPos={lat,lng};if(MK.gps)map.removeLayer(MK.gps);MK.gps=L.marker([lat,lng],{icon:gpsIcon(),zIndexOffset:2000}).addTo(map).bindPopup(`<b>📡 YOUR LOCATION</b><br>±${acc.toFixed(0)}m<br>${lat.toFixed(6)}, ${lng.toFixed(6)}`);document.getElementById('gpsSt').innerHTML=`📡 ${lat.toFixed(5)}, ${lng.toFixed(5)}<br><small style="color:var(--t3)">±${acc.toFixed(0)}m</small>`;if(map.getZoom()<10)map.setView([lat,lng],13);},
+    err=>{document.getElementById('gpsSt').textContent='Error: '+err.message;toast('GPS: '+err.message,'err');},
+    {enableHighAccuracy:true,maximumAge:4000,timeout:12000}
+  );toast('📡 GPS tracking started','ok');
+}
+function stopGPS(){
+  if(S.gpsId!==null){navigator.geolocation.clearWatch(S.gpsId);S.gpsId=null;}
+  document.getElementById('rtbar').classList.remove('on'); document.getElementById('gpsBtn').classList.remove('on');
+  document.getElementById('gpsLbl').textContent='GPS'; document.getElementById('gpsSt').textContent='GPS stopped';
+  toast('GPS stopped');
+}
+function depotFromGPS(){if(!S.gpsPos){toast('Enable GPS first','err');return;}placeDepot(S.gpsPos.lat,S.gpsPos.lng,'My Location');map.setView([S.gpsPos.lat,S.gpsPos.lng],14);}
+
+// ════════════════════════════════════════════════════════════════
+// API / GEOCODING
+// ════════════════════════════════════════════════════════════════
+async function checkAPI(){
+  try{
+    const r=await fetch(`${API}/api/health`);const d=await r.json();
+    apiOnline=true;document.getElementById('apiDot').className='dot live';
+    document.getElementById('apiTxt').textContent=`Backend v${d.version||'2.0'}`;
+  }catch{
+    apiOnline=false;document.getElementById('apiDot').className='dot';
+    document.getElementById('apiTxt').textContent='Browser mode';
+  }
+}
+async function revGeo(lat,lng){
+  try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16`,{headers:{'Accept-Language':'en','User-Agent':'EVRouteOptimizer/2.0'}});const d=await r.json();return d.display_name?d.display_name.split(',').slice(0,3).join(', '):null;}catch{return null;}
+}
+async function doSearch(){
+  const q=document.getElementById('si').value.trim();if(!q)return;
+  showOv('Searching in India…');
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8&addressdetails=1&countrycodes=in`,{headers:{'Accept-Language':'en','User-Agent':'EVRouteOptimizer/2.0'}});
+    const results=await r.json(); hideOv();
+    const india=results.filter(x=>{const addr=x.address||{};return !addr.country_code||addr.country_code==='in';});
+    if(!india.length){toast('No results found in India','warn');document.getElementById('sr').innerHTML='';return;}
+    window._sr=india;
+    document.getElementById('sr').innerHTML=india.slice(0,5).map((x,i)=>{
+      const lat=parseFloat(x.lat),lng=parseFloat(x.lon);
+      return `<div class="sres"><div class="sres-name" onclick="jumpTo(${i})">📍 ${(x.display_name||'').split(',').slice(0,3).join(', ')}</div><div class="sres-coord">${lat.toFixed(5)}, ${lng.toFixed(5)}</div><div class="sres-acts" style="font-size:10px;"><button class="sres-act dep" onclick="addLocation(${lat}, ${lng}, 'depot')">🏭 Depot</button>
+<button class="sres-act del" onclick="addLocation(${lat}, ${lng}, 'delivery')">📦 Delivery</button>
+<button class="sres-act chr" onclick="addLocation(${lat}, ${lng}, 'station')">⚡ Station</button><button class="sres-act jmp" onclick="jumpTo(${i})">🗺 Map</button></div></div>`;
+    }).join('');
+    map.setView([parseFloat(india[0].lat),parseFloat(india[0].lon)],13);
+  }catch(e){hideOv();toast('Search failed: '+e.message,'err');}
+}
+function _sr(i){const x=(window._sr||[])[i];if(!x)return null;return{lat:parseFloat(x.lat),lng:parseFloat(x.lon),name:(x.display_name||'').split(',').slice(0,2).join(', ').trim()||`Result ${i+1}`};}
+function jumpTo(i){const r=_sr(i);if(r)map.setView([r.lat,r.lng],15);}
+function srDepot(i){
+  const r=_sr(i);
+  if(!r)return;
+
+  placeDepot(r.lat,r.lng,r.name);
+  map.setView([r.lat,r.lng],14);
+
+  highlightResult(i, 'depot');
+
+  document.getElementById('sr').innerHTML='';
+  document.getElementById('si').value=r.name.split(',')[0];
+
+  scrollToNodes();
+  toast('🏭 Depot selected from search','ok');
+}
+function srDelivery(i){
+  const r=_sr(i);
+  if(!r)return;
+
+  placeDelivery(r.lat,r.lng,r.name.split(',')[0]||`Stop ${S.deliveries.length+1}`);
+  map.setView([r.lat,r.lng],14);
+
+  highlightResult(i, 'delivery');
+  scrollToNodes();
+
+  toast('📦 Delivery added from search','ok');
+}
+function srStation(i){
+  const r=_sr(i);
+  if(!r)return;
+
+  placeStation(r.lat,r.lng,r.name.split(',')[0]||`Station ${S.stations.length+1}`,'manual');
+  map.setView([r.lat,r.lng],14);
+
+  highlightResult(i, 'station');
+  scrollToNodes();
+
+  toast('⚡ Charging station added from search','ok');
+}
+
+function highlightResult(index, type){
+  const items = document.querySelectorAll('.sres');
+
+  items.forEach((el, i) => {
+    if(i === index){
+
+      let color = "var(--cy)";
+      if(type === 'delivery') color = "var(--pu)";
+      if(type === 'station') color = "var(--gn)";
+
+      el.style.border = `1.5px solid ${color}`;
+      el.style.boxShadow = `0 0 12px ${color}`;
+
+    } else {
+      el.style.border = "";
+      el.style.boxShadow = "";
+    }
+  });
+}
+
+function scrollToNodes(){
+  const section = document.getElementById('sec-nodes');
+  if(section){
+    if(section.classList.contains('col')){
+  section.classList.remove('col');
+}
+    section.scrollIntoView({behavior: 'smooth'});
+  }
+}
+
+function addLocation(lat, lng, type){
+  lat = parseFloat(lat);
+  lng = parseFloat(lng);
+
+  if(type === 'depot'){
+    placeDepot(lat, lng, "Selected Location");
+    map.setView([lat, lng], 14);
+  }
+  else if(type === 'delivery'){
+    placeDelivery(lat, lng, `Stop ${S.deliveries.length + 1}`);
+    map.setView([lat, lng], 14);
+  }
+  else if(type === 'station'){
+    placeStation(lat, lng, `Station ${S.stations.length + 1}`, 'manual');
+    map.setView([lat, lng], 14);
+  }
+
+  scrollToNodes();
+  toast(`📍 ${type.toUpperCase()} added`, 'ok');
+}
+
+
+// ════════════════════════════════════════════════════════════════
+// FETCH EV STATIONS (Overpass — global)
+// ════════════════════════════════════════════════════════════════
+async function fetchStations(quiet=false){
+  const center=S.depot||S.gpsPos;
+  if(!center){toast('Set depot or enable GPS first','warn');return;}
+  const rad=+document.getElementById('rad').value||30;
+  if(!quiet)showOv(`Searching EV stations within ${rad}km…`,'Querying OpenStreetMap Overpass API');
+  try{
+    const radM=rad*1000;
+    const q=`[out:json][timeout:25];(node["amenity"="charging_station"](around:${radM},${center.lat},${center.lng});way["amenity"="charging_station"](around:${radM},${center.lat},${center.lng}););out body center;`;
+    const r=await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`);
+    const raw=await r.json(); if(!quiet)hideOv();
+    let added=0;
+    (raw.elements||[]).slice(0,40).forEach(el=>{
+      const lat=el.lat||el.center?.lat,lng=el.lon||el.center?.lon;
+      if(!lat||!lng)return;
+      const dup=S.stations.some(x=>Math.abs(x.lat-lat)<0.0001&&Math.abs(x.lng-lng)<0.0001);
+      if(!dup){placeStation(lat,lng,(el.tags?.name)||`EV #${String(el.id).slice(-4)}`,'osm');added++;}
+    });
+    if(!quiet)toast(added?`⚡ Found ${added} EV stations nearby`:'No new stations found in this area',added?'ok':'warn');
+    if(added&&S.stations.length){const b=L.latLngBounds(S.stations.map(s=>[s.lat,s.lng]));if(S.depot)b.extend([S.depot.lat,S.depot.lng]);map.fitBounds(b,{padding:[40,40]});}
+  }catch(e){if(!quiet)hideOv();if(!quiet)toast('Station fetch failed: '+e.message,'err');}
+}
+
+// ════════════════════════════════════════════════════════════════
+// LOCAL ALGORITHMS (browser fallback — no backend needed)
+// ════════════════════════════════════════════════════════════════
+function hav(a,b){
+  const R=6371;
+  const dLat=(b.lat-a.lat)*Math.PI/180;
+  const dLng=(b.lng-a.lng)*Math.PI/180;
+  const x=Math.sin(dLat/2)**2 +
+    Math.cos(a.lat*Math.PI/180) *
+    Math.cos(b.lat*Math.PI/180) *
+    Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+
+function tourDist(depot,order){if(!order.length)return 0;let d=hav(depot,order[0]);for(let i=1;i<order.length;i++)d+=hav(order[i-1],order[i]);return d;}
+function orderGreedy(depot,dels){let todo=[...dels],cur=depot,res=[];while(todo.length){todo.sort((a,b)=>hav(cur,a)-hav(cur,b));res.push(todo.shift());cur=res[res.length-1];}return res;}
+function order2opt(depot,dels,mp=150){if(dels.length<=2)return[...dels];let o=orderGreedy(depot,dels),imp=true,p=0;while(imp&&p<mp){imp=false;p++;for(let i=0;i<o.length-1;i++)for(let j=i+2;j<o.length;j++){const pi=i===0?depot:o[i-1],nj=j+1<o.length?o[j+1]:null,b=hav(pi,o[i])+(nj?hav(o[j],nj):0),a=hav(pi,o[j])+(nj?hav(o[i],nj):0);if(a<b-1e-6){o.splice(i,j-i+1,...o.slice(i,j+1).reverse());imp=true;}}}return o;}
+function orderInsertion(depot,dels){if(!dels.length)return[];if(dels.length===1)return[...dels];let far=dels.reduce((b,d)=>hav(depot,d)>hav(depot,b)?d:b,dels[0]),route=[far],rem=dels.filter(d=>d!==far);while(rem.length){let near=rem.reduce((b,u)=>Math.min(...route.map(r=>hav(r,u)))<Math.min(...route.map(r=>hav(r,b)))?u:b,rem[0]);let bc=Infinity,bp=0;for(let k=0;k<=route.length;k++){const pv=k===0?depot:route[k-1],nx=k<route.length?route[k]:null,c=hav(pv,near)+(nx?hav(near,nx)-hav(pv,nx):0);if(c<bc){bc=c;bp=k;}}route.splice(bp,0,near);rem=rem.filter(d=>d!==near);}return route;}
+function orderGenetic(depot,dels,pop=60,gen=200,mr=0.15,elite=8){
+  const n=dels.length;if(n<=2)return orderGreedy(depot,dels);
+  const fit=p=>1/(tourDist(depot,p.map(i=>dels[i]))+1e-9);
+  const ox1=(p1,p2)=>{const[a,b]=[...new Array(2).fill(0).map(()=>Math.floor(Math.random()*n))].sort((x,y)=>x-y);const c=new Array(n).fill(-1);c.splice(a,b-a+1,...p1.slice(a,b+1));const fill=p2.filter(x=>!c.includes(x));let ptr=0;for(let i=0;i<n;i++)if(c[i]===-1)c[i]=fill[ptr++];return c;};
+  const mut=p=>{const q=[...p];if(Math.random()<.5){const[i,j]=[Math.floor(Math.random()*n),Math.floor(Math.random()*n)];[q[i],q[j]]=[q[j],q[i]];}else{const[i,j]=[Math.floor(Math.random()*n),Math.floor(Math.random()*n)].sort((a,b)=>a-b);q.splice(i,j-i+1,...q.slice(i,j+1).reverse());}return q;};
+  const seed=Array.from({length:n},(_,i)=>i);
+  const grP=orderGreedy(depot,dels).map(d=>dels.indexOf(d));
+  let pop2=[grP,...Array.from({length:pop-1},()=>[...seed].sort(()=>Math.random()-.5))];
+  let bestP=grP,bestF=fit(grP);
+  for(let g=0;g<gen;g++){const sc=pop2.sort((a,b)=>fit(b)-fit(a));if(fit(sc[0])>bestF){bestF=fit(sc[0]);bestP=sc[0];}const newP=sc.slice(0,elite);while(newP.length<pop){const p1=sc[Math.floor(Math.random()*pop/2)],p2=sc[Math.floor(Math.random()*pop/2)];let ch=ox1(p1,p2);if(Math.random()<mr)ch=mut(ch);newP.push(ch);}pop2=newP;}
+  return bestP.map(i=>dels[i]);
+}
+function orderACO(depot,dels,ants=25,iter=80,alpha=1,beta=3,rho=.3,q=100){
+  const n=dels.length;if(n<=2)return orderGreedy(depot,dels);
+  const nodes=[depot,...dels];
+  const dist=(i,j)=>hav(nodes[i],nodes[j]);
+  const tau=Array.from({length:n+1},()=>new Array(n+1).fill(1));
+  const eta=Array.from({length:n+1},(_,i)=>Array.from({length:n+1},(_,j)=>i!==j?1/(dist(i,j)+1e-9):0));
+  let best=orderGreedy(depot,dels),bestD=tourDist(depot,best);
+  for(let it=0;it<iter;it++){
+    const tours=[];
+    for(let a=0;a<ants;a++){
+      const vis=new Array(n+1).fill(false);vis[0]=true;const tour=[];let cur=0;
+      for(let step=0;step<n;step++){
+        const cands=Array.from({length:n},(_,j)=>j+1).filter(j=>!vis[j]);
+        const ws=cands.map(j=>tau[cur][j]**alpha*eta[cur][j]**beta);
+        const tot=ws.reduce((a,b)=>a+b,0);let r=Math.random()*tot,chosen=cands[cands.length-1];
+        let cum=0;for(let k=0;k<cands.length;k++){cum+=ws[k];if(cum>=r){chosen=cands[k];break;}}
+        tour.push(chosen);vis[chosen]=true;cur=chosen;
+      }
+      const tn=tour.map(j=>dels[j-1]);const d=tourDist(depot,tn);tours.push({d,tour});if(d<bestD){bestD=d;best=tn;}
+    }
+    for(let i=0;i<=n;i++)for(let j=0;j<=n;j++){tau[i][j]*=(1-rho);tau[i][j]=Math.max(tau[i][j],1e-6);}
+    tours.sort((a,b)=>a.d-b.d).slice(0,Math.max(1,Math.floor(ants/3))).forEach(({d,tour})=>{const dep=q/(d+1e-9);let pr=0;tour.forEach(j=>{tau[pr][j]+=dep;tau[j][pr]+=dep;pr=j;});});
+  }
+  return best;
+}
+
+function battSim(ordered,depot,stations,bp,mr,cons,buf){
+  let bk=(bp/100)*mr,minB=(buf/100)*mr,cur=depot,route=[],tkm=0,ch=0,warn=[];
+  route.push({node:depot,type:'depot',dist_from_prev:0,batt_after_km:bk,batt_after_pct:bp,energy_used_kwh:0,cumulative_km:0});
+  for(const d of ordered){
+    let dist=hav(cur,d);
+    if(bk-dist<minB){
+      const reach=stations.filter(s=>hav(cur,s)<bk-minB);
+      const pool=reach.length?reach:stations.filter(s=>hav(cur,s)<bk);
+      if(!pool.length){warn.push(`Cannot reach any charging station from '${cur.name||'?'}'`);break;}
+      pool.sort((a,b)=>(hav(cur,a)+hav(a,d))-(hav(cur,b)+hav(b,d)));
+      const cs=pool[0],dcs=hav(cur,cs);bk-=dcs;tkm+=dcs;ch++;
+      route.push({node:cs,type:'charging',dist_from_prev:round2(dcs),batt_after_km:mr,batt_after_pct:100,energy_used_kwh:round2(dcs*cons),cumulative_km:round2(tkm)});
+      bk=mr;cur=cs;dist=hav(cur,d);
+    }
+    bk-=dist;tkm+=dist;
+    route.push({node:d,type:'delivery',dist_from_prev:round2(dist),batt_after_km:round2(bk),batt_after_pct:round1((bk/mr)*100),energy_used_kwh:round2(dist*cons),cumulative_km:round2(tkm)});
+    cur=d;
+  }
+  const tkwh=round2(route.reduce((s,r)=>s+r.energy_used_kwh,0));
+  return{route,stats:{total_km:round2(tkm),total_energy_kwh:tkwh,deliveries_completed:route.filter(s=>s.type==='delivery').length,deliveries_total:ordered.length,charge_stops:ch,final_battery_pct:route.length?route[route.length-1].batt_after_pct:bp,estimated_minutes:Math.round(tkm/50*60+ch*30)},warnings:warn};
+}
+function round2(x){return Math.round(x*100)/100;} function round1(x){return Math.round(x*10)/10;}
+function score(st){
+  return (
+    st.total_km * 1.0 +
+    st.charge_stops * 20 +
+    (100 - st.final_battery_pct) * 0.5
+  );
+}
+
+function runLocalAlgo(key,depot,dels,stations,batt){
+  const fns={greedy:orderGreedy,twoopt:order2opt,insertion:orderInsertion,genetic:orderGenetic,aco:orderACO};
+  const a=ALGOS[key],ordered=fns[key](depot,dels);
+  const res=battSim(ordered,depot,stations,batt.current_pct,batt.max_range_km,batt.consumption_rate,batt.buffer_pct);
+  res.algorithm_key=key;res.algorithm_name=a.name;res.algorithm_label=a.label;res.algorithm_icon=a.icon;
+  res.stats.algorithm_used=a.name+' ('+a.label+')';
+  console.log("Running algo:", key, ordered);
+  return res;
+}
+
+// ════════════════════════════════════════════════════════════════
+// OPTIMIZE — single
+// ════════════════════════════════════════════════════════════════
+async function optimize(){
+  if(!S.depot){toast('Set a depot first','err');return;}
+  if(!S.deliveries.length){toast('Add at least one delivery stop','err');return;}
+  if(!S.stations.length){showOv('Fetching nearby EV stations…');await fetchStations(true);}
+  showOv('Optimizing route…','Running '+ALGOS[selectedAlgo].name);
+  await sleep(80);
+  const batt=getBatt();
+  let result;
+  if(apiOnline){
+    try{
+      const r=await fetch(`${API}/api/optimize/route`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({depot:S.depot,deliveries:S.deliveries,stations:S.stations,battery:batt,algorithm:selectedAlgo})});
+      result=await r.json();
+    }catch{result=runLocalAlgo(selectedAlgo,S.depot,S.deliveries,S.stations,batt);}
+  }else{
+    result=runLocalAlgo(selectedAlgo,S.depot,S.deliveries,S.stations,batt);
+  }
+  hideOv();displayedResult=result;allResults={[selectedAlgo]:result};
+  drawRoute(result.route);openResults(result,false,null);
+  toast(`✅ ${result.stats.total_km.toFixed(1)}km · ${result.stats.deliveries_completed} stops · ${result.stats.charge_stops} charges`,'ok');
+}
+
+async function optimize(){
+  if(!S.depot){
+    toast('Set a depot first','err');
+    return;
+  }
+  if(!S.deliveries.length){
+    toast('Add at least one delivery stop','err');
+    return;
+  }
+
+  // rest of your code...
+}
+
+function validateAndOptimize(){
+  if(!S.depot){
+    toast('❌ Please add a depot first','err');
+    return;
+  }
+
+  if(S.deliveries.length === 0){
+    toast('❌ Add at least one delivery location','err');
+    return;
+  }
+
+  optimize();
+}
+
+// ════════════════════════════════════════════════════════════════
+// COMPARE ALL
+// ════════════════════════════════════════════════════════════════
+async function runCompare(){
+  if(!S.deliveries.length){
+  toast('❌ Add at least one delivery stop','err');
+  return;
+}
+  if(!S.depot){toast('Set a depot first','err');return;}
+  if(!S.deliveries.length){toast('Add at least one delivery stop','err');return;}
+  if(!S.stations.length){showOv('Fetching nearby EV stations…');await fetchStations(true);}
+  document.getElementById('cmpBtn').classList.add('loading');
+  const batt=getBatt();
+  let results={},ranking=[],best=null,rec='';
+
+  if(apiOnline){
+    showOv('Running all 5 algorithms on backend…','This may take a few seconds');
+    try{
+      const r=await fetch(`${API}/api/optimize/compare`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({depot:S.depot,deliveries:S.deliveries,stations:S.stations,battery:batt})});
+      const d=await r.json();
+      results=d.results;ranking=d.ranking;best=d.best;rec=d.recommendation;
+    }catch{apiOnline=false;}
+  }
+  if(!Object.keys(results).length){
+    showOv('Running all 5 algorithms…','Browser computation');
+    for(const key of Object.keys(ALGOS)){
+      document.getElementById('ovMsg').textContent='Running '+ALGOS[key].name+'…';
+      await sleep(40);
+      results[key]=runLocalAlgo(key,S.depot,S.deliveries,S.stations,batt);
+      results[key]._score=score(results[key].stats);
+    }
+    const sorted=Object.entries(results).sort((a,b)=>a[1]._score-b[1]._score);
+    best=sorted[0][0];
+    ranking=sorted.map(([k,r],i)=>({rank:i+1,algo_key:k,algo_name:ALGOS[k].name,algo_label:ALGOS[k].label,algo_icon:ALGOS[k].icon,score:round2(r._score),...r.stats}));
+    const br=results[best];rec=`${ALGOS[best].name} (${ALGOS[best].label}) is the best route: ${br.stats.total_km.toFixed(1)}km, ${br.stats.charge_stops} charging stop(s), ${br.stats.total_energy_kwh.toFixed(1)} kWh used.`;
+  }
+  hideOv(); document.getElementById('cmpBtn').classList.remove('loading');
+  allResults=results;displayedResult=results[best];
+  // Annotate best
+  Object.values(results).forEach(r=>r._best=false);results[best]._best=true;
+  drawRoute(results[best].route);openResults(results[best],true,{results,ranking,best,recommendation:rec});
+  toast(`🏆 Best: ${ALGOS[best].name} · ${results[best].stats.total_km.toFixed(1)}km`,'ok');
+}
+
+function getBatt(){return{current_pct:+document.getElementById('batt').value,max_range_km:+document.getElementById('maxr').value,consumption_rate:+document.getElementById('cons').value,buffer_pct:+document.getElementById('buf').value};}
+
+// ════════════════════════════════════════════════════════════════
+// DRAW ROUTE (colored by battery)
+// ════════════════════════════════════════════════════════════════
+function drawRoute(route){
+  routeLayer.clearLayers();
+  if(!route||!route.length)return;
+  for(let i=0;i<route.length-1;i++){
+    const pct=route[i].batt_after_pct,c=pct>65?'#00e87a':pct>30?'#ffb300':'#ff4757';
+    L.polyline([[route[i].node.lat,route[i].node.lng],[route[i+1].node.lat,route[i+1].node.lng]],{color:c,weight:6,opacity:.88}).addTo(routeLayer);
+  }
+  L.polyline(route.map(p=>[p.node.lat,p.node.lng]),{color:'white',weight:1.5,opacity:.3,dashArray:'6,10'}).addTo(routeLayer);
+  let dn=0;
+  route.forEach((p,i)=>{
+    if(p.type==='depot')return;
+    if(p.type==='charging'){
+      L.marker([p.node.lat,p.node.lng],{icon:statIcon('route'),zIndexOffset:800}).addTo(routeLayer)
+        .bindPopup(`<b style="color:#00e87a">⚡ Charging Stop</b><br>${p.node.name||'Charging Station'}<br>Battery: ${p.batt_after_pct.toFixed(0)}% after charging<br>+${p.dist_from_prev.toFixed(1)}km`);
+    }else{dn++;L.marker([p.node.lat,p.node.lng],{icon:delivIcon(dn,true),zIndexOffset:800}).addTo(routeLayer).bindPopup(`<b style="color:#00d4ff">📦 Stop #${dn}: ${p.node.name||'Delivery'}</b><br>Battery: ${p.batt_after_pct.toFixed(0)}%<br>+${p.dist_from_prev.toFixed(1)}km · ${(p.energy_used_kwh||0).toFixed(2)}kWh`);}
+  });
+  map.fitBounds(L.latLngBounds(route.map(p=>[p.node.lat,p.node.lng])),{padding:[60,60]});
+}
+
+// ════════════════════════════════════════════════════════════════
+// RENDER RESULTS
+// ════════════════════════════════════════════════════════════════
+function openResults(main,showCmp,cmpData){
+  document.getElementById('result-panel').classList.add('open');
+  renderCmpTab(main,showCmp,cmpData);
+  renderSteps(main);
+  renderData(main);
+}
+function selectAlgoResult(key){
+  if(!allResults||!allResults[key])return;
+  const r=allResults[key];displayedResult=r;drawRoute(r.route);renderSteps(r);renderData(r);
+  document.querySelectorAll('.ac').forEach(e=>e.classList.remove('sel'));
+  const el=document.getElementById('ac-'+key);if(el)el.classList.add('sel');
+  rpTab(document.querySelector('.rp-tab[data-rv="rv-steps"]'));
+  toast(`🗺 Showing ${r.algorithm_name}`,'ok');
+}
+function renderCmpTab(main,showCmp,cd){
+  const c=document.getElementById('rv-cmp');
+  if(showCmp&&cd){
+    const{results,ranking,best,recommendation}=cd;
+    let h=`<div class="rec"><div class="rec-title">🏆 Recommended Route</div><div class="rec-body">${recommendation||''}</div></div>
+    <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:8px">All Algorithms — Ranked</div>
+    <div class="algo-cards">`;
+    ranking.forEach(row=>{
+      const r=results[row.algo_key],isBest=row.algo_key===best;
+      const maxScore = Math.max(...ranking.map(r => r.score));
+const minScore = Math.min(...ranking.map(r => r.score));
+const normalized = (maxScore - row.score) / (maxScore - minScore + 0.0001);
+const stars = Math.round(1 + normalized * 4);
+      h+=`<div class="ac${isBest?' best':''}" id="ac-${row.algo_key}" onclick="selectAlgoResult('${row.algo_key}')">
+        <div class="ac-hdr"><span class="ac-ico">${row.algo_icon||'🔹'}</span><span class="ac-nm">${row.algo_name}</span>
+          ${isBest?'<span class="ac-badge b-best">Best</span>':''}
+          <span style="font-size:9px;color:var(--t3);font-family:var(--mono)">#${row.rank}</span></div>
+        <div class="ac-metrics">
+          <div class="ac-met"><div class="ac-mv" style="color:var(--cy)">${row.total_km||r.stats.total_km}</div><div class="ac-ml">km</div></div>
+          <div class="ac-met"><div class="ac-mv" style="color:var(--gn)">${row.charge_stops||r.stats.charge_stops}</div><div class="ac-ml">charges</div></div>
+          <div class="ac-met"><div class="ac-mv" style="color:var(--am)">${(row.total_energy_kwh||r.stats.total_energy_kwh).toFixed(1)}</div><div class="ac-ml">kWh</div></div>
+          <div class="ac-met"><div class="ac-mv" style="color:var(--pu)">${row.estimated_minutes||r.stats.estimated_minutes||'—'}</div><div class="ac-ml">min</div></div>
+          <div class="ac-met"><div class="ac-mv" style="color:var(--rd)">${(row.final_battery_pct||r.stats.final_battery_pct).toFixed(0)}%</div><div class="ac-ml">batt</div></div>
+        </div>
+        <div class="ac-foot"><div class="stars">${'★'.repeat(stars)+'☆'.repeat(5-stars)}</div><button class="view-btn" onclick="event.stopPropagation();selectAlgoResult('${row.algo_key}')">View Route</button></div>
+      </div>`;
+    });
+    h+='</div>';
+    c.innerHTML=h;
+    const bestEl=document.getElementById('ac-'+best);if(bestEl)bestEl.classList.add('sel');
+  }else{
+    const r=main.stats;
+    c.innerHTML=`<div class="rec"><div class="rec-title">Route Computed</div><div class="rec-body">Strategy: ${main.algorithm_name}</div><div class="rec-algo">${main.algorithm_label}</div></div>
+    <div class="sstats">
+      <div class="sstat"><div class="sstat-v">${r.total_km.toFixed(0)}</div><div class="sstat-l">km</div></div>
+      <div class="sstat"><div class="sstat-v" style="color:var(--pu)">${r.deliveries_completed}</div><div class="sstat-l">stops</div></div>
+      <div class="sstat"><div class="sstat-v" style="color:var(--gn)">${r.charge_stops}</div><div class="sstat-l">charges</div></div>
+      <div class="sstat"><div class="sstat-v" style="color:var(--am)">${r.total_energy_kwh.toFixed(1)}</div><div class="sstat-l">kWh</div></div>
+      <div class="sstat"><div class="sstat-v" style="color:var(--rd)">${r.final_battery_pct.toFixed(0)}%</div><div class="sstat-l">final batt</div></div>
+      <div class="sstat"><div class="sstat-v" style="color:var(--t2);font-size:14px">${r.estimated_minutes||'—'}</div><div class="sstat-l">est. min</div></div>
+    </div>
+    <button class="cmp-btn" onclick="runCompare()">🔬 Compare All 5 Algorithms</button>`;
+  }
+}
+function renderSteps(res){
+  const{route,stats}=res;
+  document.getElementById('rv-steps').innerHTML=`
+  <div class="sstats">
+    <div class="sstat"><div class="sstat-v">${stats.total_km.toFixed(0)}</div><div class="sstat-l">km</div></div>
+    <div class="sstat"><div class="sstat-v" style="color:var(--pu)">${stats.deliveries_completed}</div><div class="sstat-l">stops</div></div>
+    <div class="sstat"><div class="sstat-v" style="color:var(--gn)">${stats.charge_stops}</div><div class="sstat-l">charges</div></div>
+    <div class="sstat"><div class="sstat-v" style="color:var(--am)">${stats.total_energy_kwh.toFixed(1)}</div><div class="sstat-l">kWh</div></div>
+    <div class="sstat"><div class="sstat-v" style="color:${stats.final_battery_pct>30?'var(--gn)':stats.final_battery_pct>10?'var(--am)':'var(--rd)'}">${stats.final_battery_pct.toFixed(0)}%</div><div class="sstat-l">final batt</div></div>
+    <div class="sstat"><div class="sstat-v" style="color:var(--t2);font-size:14px">${stats.estimated_minutes||'—'}</div><div class="sstat-l">est. min</div></div>
+  </div>
+  <div class="bleg">
+    <div class="bleg-i"><div class="bleg-d" style="background:#00e87a"></div>&gt;65%</div>
+    <div class="bleg-i"><div class="bleg-d" style="background:#ffb300"></div>30–65%</div>
+    <div class="bleg-i"><div class="bleg-d" style="background:#ff4757"></div>&lt;30%</div>
+  </div>
+  <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:6px">Route Steps</div>
+  <ul class="steps">
+    ${route.map((p,i)=>{const pct=p.batt_after_pct,bc=pct>65?'var(--gn)':pct>30?'var(--am)':'var(--rd)',bg=p.type==='depot'?'var(--cy2)':p.type==='charging'?'var(--gn2)':'var(--pu2)',col=p.type==='depot'?'var(--cy)':p.type==='charging'?'var(--gn)':'var(--pu)',ico=p.type==='depot'?'🏭':p.type==='charging'?'⚡':route.filter((x,j)=>j<=i&&x.type==='delivery').length;
+    return`<li class="step"><div class="step-ico" style="background:${bg};color:${col}">${ico}</div><div class="step-info"><div class="step-name">${p.node.name||'Location'}</div><div class="step-meta">${p.dist_from_prev>0?'+'+p.dist_from_prev.toFixed(1)+'km':'Start'} · ${(p.energy_used_kwh||0).toFixed(2)} kWh${p.type==='charging'?' · 🔋 Recharging':''}</div></div><div class="step-batt" style="color:${bc}">${pct.toFixed(0)}%</div></li>`;}).join('')}
+  </ul>
+  <div style="display:flex;gap:7px;margin-top:12px">
+    <button class="btn bx" style="flex:1" onclick="clearRoute()">✕ Clear</button>
+    <button class="btn bc" style="flex:1" onclick="optimize()">↺ Re-run</button>
+  </div>`;
+}
+function renderData(res){
+  const{stats}=res;
+  document.getElementById('rv-data').innerHTML=`
+  <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:8px">Route Summary</div>
+  <div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r2);padding:10px;font-family:var(--mono);font-size:11px;color:var(--t2);line-height:2;margin-bottom:12px">
+    <span style="color:var(--cy)">Algorithm:</span> ${res.algorithm_label||'—'}<br>
+    <span style="color:var(--cy)">Total Distance:</span> ${stats.total_km.toFixed(2)} km<br>
+    <span style="color:var(--gn)">Energy Used:</span> ${stats.total_energy_kwh.toFixed(3)} kWh<br>
+    <span style="color:var(--am)">Charging Stops:</span> ${stats.charge_stops}<br>
+    <span style="color:var(--pu)">Deliveries:</span> ${stats.deliveries_completed} / ${stats.deliveries_total}<br>
+    <span style="color:var(--rd)">Final Battery:</span> ${stats.final_battery_pct.toFixed(1)}%<br>
+    <span style="color:var(--t2)">Est. Duration:</span> ~${stats.estimated_minutes||'?'} min @ 50 km/h avg
+  </div>
+  <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:8px">Waypoints JSON</div>
+  <div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r2);padding:8px;max-height:280px;overflow-y:auto">
+    <pre style="font-family:var(--mono);font-size:9px;color:var(--t2);white-space:pre-wrap;word-break:break-all">${JSON.stringify(res.route.map(p=>({type:p.type,name:(p.node.name||'').slice(0,24),km:p.dist_from_prev.toFixed(1),batt:p.batt_after_pct.toFixed(0)+'%',cum:p.cumulative_km.toFixed(1)})),null,1)}</pre>
+  </div>`;
+}
+function closeResults(){document.getElementById('result-panel').classList.remove('open');}
+function clearRoute(){routeLayer.clearLayers();closeResults();toast('Route cleared');}
+
+// ════════════════════════════════════════════════════════════════
+// UI HELPERS
+// ════════════════════════════════════════════════════════════════
+function setMode(m){
+  S.mode=m;
+  document.querySelectorAll('.mp').forEach(p=>{p.className='mp';if(p.dataset.mode===m)p.classList.add(m==='depot'?'D':m==='delivery'?'L':'C');});
+  const h={depot:'<strong style="color:var(--cy)">DEPOT MODE</strong> — Click the map',delivery:'<strong style="color:var(--pu)">DELIVERY MODE</strong> — Click to add stop',charging:'<strong style="color:var(--gn)">STATION MODE</strong> — Click to add station'};
+  document.getElementById('mhint').innerHTML='→ '+h[m]; map.getContainer().style.cursor='crosshair';
+}
+function setStrat(el){
+  document.querySelectorAll('.strat').forEach(s=>s.classList.remove('on'));el.classList.add('on');
+  selectedAlgo=el.dataset.algo;document.getElementById('badge-strat').textContent=ALGOS[selectedAlgo].name;
+}
+function setVehicle(el){
+  document.querySelectorAll('.veh').forEach(v=>v.classList.remove('on'));el.classList.add('on');
+  const v=VEHICLES[el.dataset.v];if(v){document.getElementById('maxr').value=v.maxr;document.getElementById('cons').value=v.cons;document.getElementById('buf').value=v.buf;updateEst();toast(`Vehicle: ${el.querySelector('.veh-name').textContent}`);}
+}
+function battChange(){
+  const v=Math.min(100,Math.max(0,+document.getElementById('batt').value));
+  const c=v>65?'#00e87a':v>30?'#ffb300':'#ff4757';
+  document.getElementById('bfill').style.cssText=`width:${v}%;background:${c}`;
+  document.getElementById('bpct').style.color=c;document.getElementById('bpct').textContent=v+'%';
+  document.getElementById('badge-batt').textContent=v+'% · '+document.getElementById('maxr').value+'km';
+  updateEst();
+}
+function updateEst(){
+  const p=+document.getElementById('batt').value/100,mr=+document.getElementById('maxr').value,c=+document.getElementById('cons').value,buf=+document.getElementById('buf').value/100;
+  document.getElementById('est').innerHTML=`<span style="color:var(--cy)">${(p*mr).toFixed(1)} km</span> total range<br><span style="color:var(--gn)">${Math.max(0,(p-buf)*mr).toFixed(1)} km</span> usable<br><span style="color:var(--am)">${(p*mr*c).toFixed(2)} kWh</span> stored<br>${S.depot?`<span style="color:var(--t3)">${S.depot.name.slice(0,30)}</span>`:'<span style="color:var(--t3)">No depot set</span>'}`;
+}
+function togSec(id){document.getElementById('sec-'+id).classList.toggle('col');}
+function rpTab(el){document.querySelectorAll('.rp-tab').forEach(t=>t.classList.remove('on'));el.classList.add('on');document.querySelectorAll('.rp-view').forEach(v=>v.classList.remove('on'));document.getElementById(el.dataset.rv).classList.add('on');}
+function toggleTheme(){
+  const d=document.documentElement,dark=d.dataset.theme==='dark';
+  d.dataset.theme=dark?'light':'dark';document.getElementById('themeIco').textContent=dark?'☀️':'🌙';
+}
+function showOv(msg,sub=''){document.getElementById('ovMsg').textContent=msg;document.getElementById('ovSub').textContent=sub;document.getElementById('ov').classList.add('on');}
+function hideOv(){document.getElementById('ov').classList.remove('on');}
+let _tt;function toast(msg,type=''){const el=document.getElementById('toast');el.textContent=msg;el.className='on'+(type?' '+type:'');clearTimeout(_tt);_tt=setTimeout(()=>el.className='',4000);}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function clearAll(){clearRoute();if(MK.depot){map.removeLayer(MK.depot);MK.depot=null;}MK.deliveries.forEach(x=>map.removeLayer(x.m));MK.deliveries=[];MK.stations.forEach(x=>map.removeLayer(x.m));MK.stations=[];if(MK.gps){map.removeLayer(MK.gps);MK.gps=null;}S.depot=null;S.deliveries=[];S.stations=[];S.gpsPos=null;renderNodes();updateEst();toast('All nodes cleared');}
+
+// ════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════
+battChange();checkAPI();setInterval(checkAPI,30000);
+toast('💡 Click map to place Depot  ·  Search any location in India');
+updateValidationUI();
+</script>
+</body>
+</html>
