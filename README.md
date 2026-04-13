@@ -15,7 +15,7 @@ Features
   ->Genetic Algorithm
   ->Ant Colony Optimization
 7.  Algorithm comparison with performance metrics
-8.  ynamic route visualization with battery indicators
+8.  Dynamic route visualization with battery indicators
 
 
 How It Works
